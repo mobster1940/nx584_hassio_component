@@ -1,0 +1,7 @@
+{
+  "domain": "nx584_custom",
+  "name": "NX584",
+  "documentation": "https://www.home-assistant.io/integrations/nx584",
+  "requirements": ["git+https://github.com/mobster1940/pynx584.git#pynx584==0.5"],
+  "codeowners": []
+}
