@@ -1,0 +1,1 @@
+# nx584_hassio_component
