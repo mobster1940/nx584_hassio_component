@@ -16,7 +16,6 @@ from homeassistant.const import (
     CONF_HOST,
     CONF_NAME,
     CONF_PORT,
-    CONF_DOMAIN,
     STATE_ALARM_ARMED_AWAY,
     STATE_ALARM_ARMED_HOME,
     STATE_ALARM_DISARMED,
@@ -28,6 +27,8 @@ from homeassistant.helpers import config_validation as cv, entity_platform
 _LOGGER = logging.getLogger(__name__)
 
 SCAN_INTERVAL = timedelta(seconds=10)
+
+CONF_PARTITION = "partition"
 
 DEFAULT_HOST = "localhost"
 DEFAULT_NAME = "Alarm"
@@ -42,7 +43,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
         vol.Optional(CONF_HOST, default=DEFAULT_HOST): cv.string,
         vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
         vol.Optional(CONF_PORT, default=DEFAULT_PORT): cv.port,
-        vol.Optional(CONF_DOMAIN, default=DEFAULT_PARTITION): cv.positive_int,
+        vol.Optional(CONF_PARTITION, default=DEFAULT_PARTITION): cv.positive_int,
     }
 )
 
@@ -52,7 +53,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     name = config.get(CONF_NAME)
     host = config.get(CONF_HOST)
     port = config.get(CONF_PORT)
-    partition = config.get(CONF_DOMAIN)
+    partition = config.get(CONF_PARTITION)
 
     url = f"http://{host}:{port}"
 
@@ -116,39 +117,27 @@ class NX584Alarm(alarm.AlarmControlPanelEntity):
         """Process new events from panel."""
         try:
             part = self._alarm.list_partitions()[self._part - 1]
-            zones = self._alarm.list_zones()
         except requests.exceptions.ConnectionError as ex:
             _LOGGER.error(
                 "Unable to connect to %(host)s: %(reason)s",
                 dict(host=self._url, reason=ex),
             )
             self._state = None
-            zones = []
         except IndexError:
             _LOGGER.error("NX584 reports no partitions")
             self._state = None
-            zones = []
-
-        bypassed = False
-        for zone in zones:
-            if zone["bypassed"]:
-                _LOGGER.debug(
-                    "Zone %(zone)s is bypassed, assuming HOME",
-                    dict(zone=zone["number"]),
-                )
-                bypassed = True
-                break
 
         if not part["armed"]:
             self._state = STATE_ALARM_DISARMED
-        elif bypassed:
-            self._state = STATE_ALARM_ARMED_HOME
         else:
-            self._state = STATE_ALARM_ARMED_AWAY
-
-        for flag in part["condition_flags"]:
-            if flag == "Siren on":
+            if (len(list(filter (lambda x : x == "Siren on", part["condition_flags"]))) > 0): 
                 self._state = STATE_ALARM_TRIGGERED
+            elif (len(list(filter (lambda x : x == "Entryguard (stay mode)", part["condition_flags"]))) > 0):
+                self._state = STATE_ALARM_ARMED_HOME
+            else:
+                self._state = STATE_ALARM_ARMED_AWAY
+
+        
 
     def alarm_disarm(self, code=None, partition = 1):
         """Send disarm command."""
