@@ -116,7 +116,8 @@ class NX584Alarm(alarm.AlarmControlPanelEntity):
     def update(self):
         """Process new events from panel."""
         try:
-            part = self._alarm.list_partitions()[self._part - 1]
+            partitions = self._alarm.list_partitions()
+            part = [element for element in partitions if element["number"] == [self._part]] 
         except requests.exceptions.ConnectionError as ex:
             _LOGGER.error(
                 "Unable to connect to %(host)s: %(reason)s",
@@ -130,9 +131,10 @@ class NX584Alarm(alarm.AlarmControlPanelEntity):
         if not part["armed"]:
             self._state = STATE_ALARM_DISARMED
         else:
-            if (len(list(filter (lambda x : x == "Siren on", part["condition_flags"]))) > 0): 
+             for flag in part["condition_flags"]:
+            if flag == "Siren on":
                 self._state = STATE_ALARM_TRIGGERED
-            elif (len(list(filter (lambda x : x == "Entryguard (stay mode)", part["condition_flags"]))) > 0):
+            elif flag == "Entryguard (stay mode)"
                 self._state = STATE_ALARM_ARMED_HOME
             else:
                 self._state = STATE_ALARM_ARMED_AWAY
