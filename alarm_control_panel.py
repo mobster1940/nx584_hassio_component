@@ -1,6 +1,7 @@
 """Support for NX584 alarm control panels."""
 from datetime import timedelta
 import logging
+import json
 
 from custom_components.nx584_custom.pynx584.nx584 import client
 import requests
@@ -115,9 +116,12 @@ class NX584Alarm(alarm.AlarmControlPanelEntity):
 
     def update(self):
         """Process new events from panel."""
+        part = self._part
         try:
             partitions = self._alarm.list_partitions()
-            part = [element for element in partitions if element["number"] == [self._part]] 
+            for s in range(len(partitions)):
+                if partitions[s]["number"] == self._part:
+                    part = partitions[s]
         except requests.exceptions.ConnectionError as ex:
             _LOGGER.error(
                 "Unable to connect to %(host)s: %(reason)s",
@@ -128,10 +132,11 @@ class NX584Alarm(alarm.AlarmControlPanelEntity):
             _LOGGER.error("NX584 reports no partitions")
             self._state = None
 
+        
         if not part["armed"]:
             self._state = STATE_ALARM_DISARMED
         else:
-             for flag in part["condition_flags"]:
+            for flag in part["condition_flags"]:
                 if flag == "Siren on":
                     self._state = STATE_ALARM_TRIGGERED
                 elif flag == "Entryguard (stay mode)":
