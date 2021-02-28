@@ -132,12 +132,12 @@ class NX584Alarm(alarm.AlarmControlPanelEntity):
             self._state = STATE_ALARM_DISARMED
         else:
              for flag in part["condition_flags"]:
-            if flag == "Siren on":
-                self._state = STATE_ALARM_TRIGGERED
-            elif flag == "Entryguard (stay mode)"
-                self._state = STATE_ALARM_ARMED_HOME
-            else:
-                self._state = STATE_ALARM_ARMED_AWAY
+                if flag == "Siren on":
+                    self._state = STATE_ALARM_TRIGGERED
+                elif flag == "Entryguard (stay mode)"
+                    self._state = STATE_ALARM_ARMED_HOME
+                else:
+                    self._state = STATE_ALARM_ARMED_AWAY
 
         
 
