@@ -8,22 +8,19 @@ import requests
 import voluptuous as vol
 
 import homeassistant.components.alarm_control_panel as alarm
-from homeassistant.components.alarm_control_panel import PLATFORM_SCHEMA
-from homeassistant.components.alarm_control_panel.const import (
-    SUPPORT_ALARM_ARM_AWAY,
-    SUPPORT_ALARM_ARM_HOME,
+from homeassistant.components.alarm_control_panel import (
+    PLATFORM_SCHEMA as ALARM_CONTROL_PANEL_PLATFORM_SCHEMA,
+    AlarmControlPanelEntity,
+    AlarmControlPanelEntityFeature,
+    AlarmControlPanelState,
+    CodeFormat,
 )
-from homeassistant.const import (
-    CONF_HOST,
-    CONF_NAME,
-    CONF_PORT,
-    STATE_ALARM_ARMED_AWAY,
-    STATE_ALARM_ARMED_HOME,
-    STATE_ALARM_DISARMED,
-    STATE_ALARM_TRIGGERED,
-)
+from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers import config_validation as cv, entity_platform
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,7 +36,7 @@ SERVICE_BYPASS_ZONE = "bypass_zone"
 SERVICE_UNBYPASS_ZONE = "unbypass_zone"
 ATTR_ZONE = "zone"
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
+PLATFORM_SCHEMA = ALARM_CONTROL_PANEL_PLATFORM_SCHEMA.extend(
     {
         vol.Optional(CONF_HOST, default=DEFAULT_HOST): cv.string,
         vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
@@ -49,7 +46,12 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 )
 
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
+async def async_setup_platform(
+    hass: HomeAssistant,
+    config: ConfigType,
+    async_add_entities: AddEntitiesCallback,
+    discovery_info: DiscoveryInfoType | None = None,
+) -> None:
     """Set up the NX584 platform."""
     name = config.get(CONF_NAME)
     host = config.get(CONF_HOST)
@@ -65,12 +67,12 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         _LOGGER.error(
             "Unable to connect to %(host)s: %(reason)s", dict(host=url, reason=ex),
         )
-        raise PlatformNotReady
+        raise PlatformNotReady from ex
 
     entity = NX584Alarm(name, alarm_client, url, partition)
     async_add_entities([entity])
 
-    platform = entity_platform.current_platform.get()
+    platform = entity_platform.async_get_current_platform()
 
     platform.async_register_entity_service(
         SERVICE_BYPASS_ZONE, {vol.Required(ATTR_ZONE): cv.positive_int}, "alarm_bypass",
@@ -85,6 +87,13 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
 class NX584Alarm(alarm.AlarmControlPanelEntity):
     """Representation of a NX584-based alarm panel."""
+
+    _attr_code_format = CodeFormat.NUMBER
+    _attr_supported_features = (
+        AlarmControlPanelEntityFeature.ARM_HOME
+        | AlarmControlPanelEntityFeature.ARM_AWAY
+    )
+    _attr_code_arm_required = False
 
     def __init__(self, name, alarm_client, url, partition):
         """Init the nx584 alarm panel."""
@@ -134,14 +143,14 @@ class NX584Alarm(alarm.AlarmControlPanelEntity):
 
         
         if not part["armed"]:
-            self._state = STATE_ALARM_DISARMED
+            self._state = AlarmControlPanelState.DISARMED
         else:
             if 'Siren on' in part["condition_flags"]:
-                self._state = STATE_ALARM_TRIGGERED
+                self._state = AlarmControlPanelState.TRIGGERED
             elif 'Entryguard (stay mode)' in part["condition_flags"]:
-                self._state = STATE_ALARM_ARMED_HOME
+                self._state = AlarmControlPanelState.ARMED_HOME
             else:
-                self._state = STATE_ALARM_ARMED_AWAY
+                self._state = AlarmControlPanelState.ARMED_AWAY
 
         
 
